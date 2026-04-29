@@ -5646,6 +5646,77 @@
                     备注: "因政治审查未能完整出版，成为现代文学出版史重要事件。",
                 },
             ];
+
+            const transitionConfigs = [
+                {
+                    city: "北京",
+                    range: "1924-1927",
+                    title: "从「自叙感伤」转向「城乡审视」",
+                    desc: "都市流寓的困顿中，以文字纾解孤寂，用现代视角回望湘西并批判都市虚浮。",
+                },
+                {
+                    city: "北京",
+                    range: "1931.5-1931.8",
+                    title: "从「悲情宣泄」转向「身份自省」",
+                    desc: "重返北平休整沉淀，反思城乡文明隔阂，明晰“乡下人”创作立场。",
+                },
+                {
+                    city: "北京",
+                    range: "1933.8-1934.1",
+                    title: "从「个体抒写」转向「文坛担当」",
+                    desc: "工作、家庭稳定，定居北平，坚守创作初心，深度参与文坛论争。",
+                },
+                {
+                    city: "北京",
+                    range: "1934",
+                    title: "从「乡土诗写」转向「民族铸形」",
+                    desc: "完成《边城》创作，以牧歌笔调建构理想人性，打造民族精神原乡。",
+                },
+                {
+                    city: "上海",
+                    range: "1928-1930.9",
+                    title: "从「现实抒怀」转向「生命礼赞」",
+                    desc: "商业都市的生存挤压下，重构湘西世界，礼赞乡土原始生命力与本真人性。",
+                },
+                {
+                    city: "上海",
+                    range: "1931.1-1931.5",
+                    title: "从「城乡对抗」转向「悲情叙事」",
+                    desc: "在颠沛流离中以悲悯笔触书写生命无常与底层人性坚守。",
+                },
+                {
+                    city: "武汉",
+                    range: "1930.9-1930.12",
+                    title: "从「乡土书写」转向「都市思辨」",
+                    desc: "任教间隙深耕文学评论，以理性视角剖析都市文明肌理与复杂人性。",
+                },
+                {
+                    city: "青岛",
+                    range: "1931-1932",
+                    title: "从「焦虑书写」转向「温情描摹」",
+                    desc: "海滨安宁抚平心绪，褪去锋芒，以柔笔刻画乡土平凡人事，城乡对立缓和。",
+                },
+                {
+                    city: "青岛",
+                    range: "1933",
+                    title: "从「世相铺陈」转向「人性叩问」",
+                    desc: "心境的沉淀褪去叙事的喧嚣，以温润笔调叩问生命与人性的本真。",
+                },
+                {
+                    city: "湘西",
+                    range: "1934.1",
+                    title: "从「回忆建构」转向「实地回望」",
+                    desc: "返乡探母亲触故土，以真实见闻丰盈湘西书写，补足情感与生活肌理。",
+                },
+            ];
+
+            // 时间解析辅助函数：将 "1930.9" 转为 1930.09 方便数值对比
+            function parseTime(str) {
+                if (!str) return 0;
+                const parts = str.toString().split(".");
+                if (parts.length === 1) return parseFloat(parts[0]);
+                return parseFloat(parts[0]) + parseFloat(parts[1]) / 100;
+            }
             const map = L.map("map", {
                 center: [35.5, 110.5],
                 zoom: 5,
@@ -5826,40 +5897,66 @@
             }
             function showDrawer(items) {
                 const list = document.getElementById("cardList");
-                // 基础头部
+                const currentCity = items[0].活动地点.slice(-2);
+
                 list.innerHTML = `<div style="font-size:18px; font-weight:bold; color:#333; margin-bottom:20px; padding-bottom:10px; border-bottom:2px solid #8b1e1e;">${items[0].活动地点}</div>`;
 
+                const insertedTransitions = new Set();
+
                 items.forEach((item) => {
-                    // --- 逻辑点 1: 插入冲击力转型卡片 ---
-                    // 判断标准：1934年 且 地点包含“湘西”
-                    if (
-                        item.年份 === 1934 &&
-                        item.活动地点 &&
-                        item.活动地点.includes("湘西")
-                    ) {
+                    const itemTime = parseTime(
+                        item.年份 + (item.月 ? "." + item.月 : ""),
+                    );
+
+                    // 查找匹配的转型阶段
+                    const matched = transitionConfigs.find((config) => {
+                        const isCity =
+                            config.city === currentCity ||
+                            (config.city === "北京" && currentCity === "北平");
+                        if (!isCity) return false;
+
+                        // 解析配置中的时间区间，支持 "1924-1927" 或 "1934" 格式
+                        const timeParts = config.range.split("-");
+                        const start = parseTime(timeParts[0]);
+                        const end = timeParts[1]
+                            ? parseTime(timeParts[1])
+                            : start;
+
+                        return (
+                            itemTime >= start &&
+                            itemTime <= end &&
+                            !insertedTransitions.has(config.title)
+                        );
+                    });
+
+                    if (matched) {
+                        insertedTransitions.add(matched.title);
                         const impactCard = document.createElement("div");
-                        // 样式完全复现图片中的深红色质感
                         impactCard.style = `
                             background: linear-gradient(90deg, #7b1313 0%, #a12323 100%);
-                            color: #fff;
-                            padding: 30px 20px;
-                            margin-bottom: 25px;
-                            border-radius: 4px;
-                            position: relative;
-                            overflow: hidden;
-                            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-                            font-family: "STKaiti", "KaiTi", serif;
+                            color: #fff; padding: 25px 20px; margin-bottom: 25px;
+                            border-radius: 4px; position: relative; overflow: hidden;
+                            box-shadow: 0 4px 15px rgba(0,0,0,0.2); font-family: "STKaiti", "KaiTi", serif;
                         `;
                         impactCard.innerHTML = `
-                            <div style="font-family:sans-serif; font-size:11px; letter-spacing:2px; opacity:0.7; margin-bottom:10px; border-bottom:1px solid rgba(255,255,255,0.3); display:inline-block;">IDEOLOGICAL TRANSITION</div>
-                            <div style="font-size:22px; font-weight:bold; line-height:1.4; border-left:3px solid #fff; padding-left:15px; margin:10px 0;">从「激愤写实」转向「神性重塑」</div>
-                            <div style="font-size:14px; opacity:0.9; margin-top:12px; font-style:italic;">在此之后的流寓，不再是单纯的逃避，而是对民族灵魂的深度追溯。</div>
-                            <div style="position:absolute; right:-10px; bottom:-20px; font-size:120px; opacity:0.1; pointer-events:none;">沈</div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.3); padding-bottom: 5px;">
+                                <div style="font-family:sans-serif; font-size:10px; letter-spacing:2px; opacity:0.7;">创作分界</div>
+                                <div style="font-family:sans-serif; font-size:11px; font-weight:bold; background:rgba(255,255,255,0.2); padding:2px 8px; border-radius:10px;">
+                                    ${matched.range}
+                                </div>
+                            </div>
+                            <div style="font-size:20px; font-weight:bold; line-height:1.4; border-left:3px solid #fff; padding-left:15px; margin:15px 0;">
+                                ${matched.title}
+                            </div>
+                            <div style="font-size:14px; opacity:0.9; margin-top:10px; line-height:1.6; text-align: justify;">
+                                ${matched.desc}
+                            </div>
+                            <div style="position:absolute; right:-10px; bottom:-20px; font-size:100px; opacity:0.1; pointer-events:none;">沈</div>
                         `;
                         list.appendChild(impactCard);
                     }
 
-                    // --- 逻辑点 2: 保持原有常规卡片结构 ---
+                    // 常规卡片逻辑
                     const card = document.createElement("div");
                     card.className = "info-card";
                     card.innerHTML = `
@@ -5870,12 +5967,10 @@
                         <div class="info-grid">
                             <div class="info-cell"><span class="info-label">具体时间</span>${item.年份}年${item.月 ? item.月 + "月" : ""}</div>
                             <div class="info-cell"><span class="info-label">活动身份</span>${item.活动身份}</div>
-                            <div class="info-cell"><span class="info-label">主要交游</span>${item.交游者姓名 || "暂无"}</div>
                             <div class="info-cell"><span class="info-label">详细地点</span>${item.活动地点补充 || item.活动地点}</div>
                         </div>
                         <div class="info-content-box">${item.活动内容或创作缘起}</div>
-
-                        ${item.备注 ? `<div class="info-remark"><span style="color:#8b1e1e; font-weight:bold; font-style:normal; margin-right:5px;"></span>${item.备注}</div>` : ""}
+                        ${item.备注 ? `<div class="info-remark">${item.备注}</div>` : ""}
                     `;
                     list.appendChild(card);
                 });

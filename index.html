@@ -37,7 +37,7 @@
             .title-main {
                 writing-mode: vertical-rl;
                 font-family: "STKaiti", "KaiTi", serif;
-                font-size: 46px;
+                font-size: 32px;
                 font-weight: bold;
                 color: #1a1a1a;
                 letter-spacing: 10px;
@@ -49,7 +49,7 @@
             .title-sub {
                 writing-mode: vertical-rl;
                 font-family: "STKaiti", "KaiTi", serif;
-                font-size: 38px;
+                font-size: 28px;
                 color: #8b1e1e;
                 letter-spacing: 6px;
                 padding-top: 15px;
@@ -5661,9 +5661,7 @@
             const decorationLayer = L.layerGroup().addTo(map);
             const dataLayer = L.layerGroup().addTo(map);
 
-            fetch(
-                "https://geo.datav.aliyun.com/areas_v3/bound/100000_full.json",
-            )
+            fetch("./100000_full.json")
                 .then((r) => r.json())
                 .then((geo) => {
                     L.geoJSON(geo, {
@@ -5797,10 +5795,10 @@
                     });
                 }
             }
-
             function showDrawer(items) {
                 const list = document.getElementById("cardList");
                 list.innerHTML = `<div style="font-size:18px; font-weight:bold; color:#333; margin-bottom:20px; padding-bottom:10px; border-bottom:2px solid #8b1e1e;">${items[0].活动地点}</div>`;
+
                 items.forEach((item) => {
                     const card = document.createElement("div");
                     card.className = "info-card";
@@ -5816,12 +5814,12 @@
                             <div class="info-cell"><span class="info-label">详细地点</span>${item.活动地点补充 || item.活动地点}</div>
                         </div>
                         <div class="info-content-box">${item.活动内容或创作缘起}</div>
+                        ${item.备注 ? `<div class="info-remark"><span class="info-label"></span>${item.备注}</div>` : "暂无"}
                     `;
                     list.appendChild(card);
                 });
                 document.getElementById("infoDrawer").classList.add("active");
             }
-
             document
                 .getElementById("yearSlider")
                 .addEventListener("input", render);

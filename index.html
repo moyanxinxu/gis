@@ -5646,7 +5646,6 @@
                     备注: "因政治审查未能完整出版，成为现代文学出版史重要事件。",
                 },
             ];
-
             const map = L.map("map", {
                 center: [35.5, 110.5],
                 zoom: 5,
@@ -5698,68 +5697,88 @@
                     iconAnchor: [10, 10],
                 });
             }
-
             function render() {
+                // 1. 基础状态获取
                 dataLayer.clearLayers();
                 const isAll = document.getElementById("allTrackToggle").checked;
-                const selYear = Number(
-                    document.getElementById("yearSlider").value,
-                );
+                const yearSlider = document.getElementById("yearSlider");
+                const selYear = Number(yearSlider.value);
+
                 document.getElementById("yearLabel").innerText = selYear;
                 document.getElementById("timeline").style.opacity = isAll
                     ? "0.4"
                     : "1";
 
-                const sorted = [...data]
+                // 2. 预处理数据：严格按 JSON 原始顺序，仅提取有效城市
+                const processedData = data
                     .map((d) => {
-                        let rawLoc = d.活动地点 || "";
-                        let cityKey = rawLoc.trim().slice(-2);
+                        const rawLoc = (d.活动地点 || "").trim();
+                        // 取后两位作为 key（例如：北平、上海、湘西）
+                        const cityKey = rawLoc.slice(-2);
+
+                        // 兼容性处理：如果数据里写的是“北京”，统一映射到坐标库里的“北平”
                         let coordKey = cityKey;
                         if (cityKey === "北京") coordKey = "北平";
+
                         return { ...d, cityKey: coordKey };
                     })
-                    .filter((d) => mainCities[d.cityKey])
-                    .sort(
-                        (a, b) =>
-                            a.年份 * 100 +
-                            Number(a.月 || 0) -
-                            (b.年份 * 100 + Number(b.月 || 0)),
-                    );
+                    .filter((d) => mainCities[d.cityKey]); // 只保留在坐标库中存在的城市
 
                 if (isAll) {
-                    let path = [],
-                        groups = {},
-                        step = 1,
-                        lastCityKey = null;
-                    sorted.forEach((d) => {
-                        path.push(mainCities[d.cityKey]);
+                    let path = [];
+                    let groups = {};
+                    let step = 0;
+                    let lastCityKey = null;
+
+                    // 3. 计算迁移路径：按数据物理顺序识别地理位移
+                    const segments = [];
+                    processedData.forEach((d) => {
+                        // 当且仅当地理位置发生变化时，序号才增加
+                        // 这样可以确保：上海(1) -> 武汉(2) -> 上海(3) 的逻辑正确
                         if (d.cityKey !== lastCityKey) {
-                            if (!groups[d.cityKey]) groups[d.cityKey] = [];
-                            groups[d.cityKey].push(step++);
+                            step++;
+                            segments.push({
+                                step: step,
+                                city: d.cityKey,
+                                coord: mainCities[d.cityKey],
+                            });
                             lastCityKey = d.cityKey;
                         }
                     });
 
+                    // 4. 提取绘图路径并归纳每个城市的序号集合
+                    segments.forEach((seg) => {
+                        path.push(seg.coord);
+                        if (!groups[seg.city]) groups[seg.city] = [];
+                        groups[seg.city].push(seg.step);
+                    });
+
+                    // 5. 绘制轨迹线与箭头
                     for (let i = 0; i < path.length - 1; i++) {
-                        const s = path[i],
-                            e = path[i + 1];
-                        if (s[0] === e[0] && s[1] === e[1]) continue;
-                        L.polyline([s, e], {
+                        const start = path[i];
+                        const end = path[i + 1];
+
+                        // 如果坐标相同（保险处理），不画线
+                        if (start[0] === end[0] && start[1] === end[1])
+                            continue;
+
+                        L.polyline([start, end], {
                             color: "#8b1e1e",
                             weight: 1.5,
                             dashArray: "5, 8",
                             opacity: 0.4,
                         }).addTo(dataLayer);
-                        const mid = [
-                            s[0] + (e[0] - s[0]) * 0.6,
-                            s[1] + (e[1] - s[1]) * 0.6,
-                        ];
-                        L.marker(mid, {
-                            icon: createArrow(s, e),
+
+                        // 绘制指向箭头
+                        const midLat = start[0] + (end[0] - start[0]) * 0.6;
+                        const midLng = start[1] + (end[1] - start[1]) * 0.6;
+                        L.marker([midLat, midLng], {
+                            icon: createArrow(start, end),
                             interactive: false,
                         }).addTo(dataLayer);
                     }
 
+                    // 6. 绘制城市 Marker（展示合并后的序号，如 "1, 3, 5"）
                     Object.keys(groups).forEach((cKey) => {
                         const marker = L.marker(mainCities[cKey], {
                             icon: L.divIcon({
@@ -5767,39 +5786,80 @@
                                 html: `<span>${groups[cKey].join(", ")}</span>`,
                             }),
                         }).addTo(dataLayer);
-                        marker.on("click", () =>
-                            showDrawer(
-                                sorted.filter((d) => d.cityKey === cKey),
-                            ),
-                        );
+
+                        marker.on("click", () => {
+                            // 点击查看该城市在原始数据中的所有条目
+                            const cityItems = processedData.filter(
+                                (d) => d.cityKey === cKey,
+                            );
+                            showDrawer(cityItems);
+                        });
                     });
                 } else {
-                    const yearData = sorted.filter((d) => d.年份 === selYear);
-                    const counts = {};
-                    yearData.forEach(
-                        (d) =>
-                            (counts[d.cityKey] = (counts[d.cityKey] || 0) + 1),
+                    // 单年显示模式：按原始顺序筛选当年数据
+                    const yearData = processedData.filter(
+                        (d) => Number(d.年份) === selYear,
                     );
-                    Object.keys(counts).forEach((cKey) => {
-                        const marker = L.marker(mainCities[cKey], {
+                    const cityCounts = {};
+
+                    yearData.forEach((d) => {
+                        cityCounts[d.cityKey] =
+                            (cityCounts[d.cityKey] || 0) + 1;
+                    });
+
+                    Object.keys(cityCounts).forEach((cKey) => {
+                        L.marker(mainCities[cKey], {
                             icon: L.divIcon({
                                 className: "dynamic-dot",
-                                html: `<span>${counts[cKey]}</span>`,
+                                html: `<span>${cityCounts[cKey]}</span>`,
                             }),
-                        }).addTo(dataLayer);
-                        marker.on("click", () =>
-                            showDrawer(
-                                yearData.filter((d) => d.cityKey === cKey),
-                            ),
-                        );
+                        })
+                            .addTo(dataLayer)
+                            .on("click", () => {
+                                const items = yearData.filter(
+                                    (d) => d.cityKey === cKey,
+                                );
+                                showDrawer(items);
+                            });
                     });
                 }
             }
             function showDrawer(items) {
                 const list = document.getElementById("cardList");
+                // 基础头部
                 list.innerHTML = `<div style="font-size:18px; font-weight:bold; color:#333; margin-bottom:20px; padding-bottom:10px; border-bottom:2px solid #8b1e1e;">${items[0].活动地点}</div>`;
 
                 items.forEach((item) => {
+                    // --- 逻辑点 1: 插入冲击力转型卡片 ---
+                    // 判断标准：1934年 且 地点包含“湘西”
+                    if (
+                        item.年份 === 1934 &&
+                        item.活动地点 &&
+                        item.活动地点.includes("湘西")
+                    ) {
+                        const impactCard = document.createElement("div");
+                        // 样式完全复现图片中的深红色质感
+                        impactCard.style = `
+                            background: linear-gradient(90deg, #7b1313 0%, #a12323 100%);
+                            color: #fff;
+                            padding: 30px 20px;
+                            margin-bottom: 25px;
+                            border-radius: 4px;
+                            position: relative;
+                            overflow: hidden;
+                            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+                            font-family: "STKaiti", "KaiTi", serif;
+                        `;
+                        impactCard.innerHTML = `
+                            <div style="font-family:sans-serif; font-size:11px; letter-spacing:2px; opacity:0.7; margin-bottom:10px; border-bottom:1px solid rgba(255,255,255,0.3); display:inline-block;">IDEOLOGICAL TRANSITION</div>
+                            <div style="font-size:22px; font-weight:bold; line-height:1.4; border-left:3px solid #fff; padding-left:15px; margin:10px 0;">从「激愤写实」转向「神性重塑」</div>
+                            <div style="font-size:14px; opacity:0.9; margin-top:12px; font-style:italic;">在此之后的流寓，不再是单纯的逃避，而是对民族灵魂的深度追溯。</div>
+                            <div style="position:absolute; right:-10px; bottom:-20px; font-size:120px; opacity:0.1; pointer-events:none;">沈</div>
+                        `;
+                        list.appendChild(impactCard);
+                    }
+
+                    // --- 逻辑点 2: 保持原有常规卡片结构 ---
                     const card = document.createElement("div");
                     card.className = "info-card";
                     card.innerHTML = `
@@ -5814,10 +5874,12 @@
                             <div class="info-cell"><span class="info-label">详细地点</span>${item.活动地点补充 || item.活动地点}</div>
                         </div>
                         <div class="info-content-box">${item.活动内容或创作缘起}</div>
-                        ${item.备注 ? `<div class="info-remark"><span class="info-label"></span>${item.备注}</div>` : "暂无"}
+
+                        ${item.备注 ? `<div class="info-remark"><span style="color:#8b1e1e; font-weight:bold; font-style:normal; margin-right:5px;">注：</span>${item.备注}</div>` : ""}
                     `;
                     list.appendChild(card);
                 });
+
                 document.getElementById("infoDrawer").classList.add("active");
             }
             document
